@@ -1,0 +1,78 @@
+/**
+ * Cycling Power vs Speed Physics Engine
+ * Based on the standard model of cycling power.
+ */
+
+export interface PhysicsParams {
+  riderWeight: number; // kg
+  bikeWeight: number; // kg
+  power: number; // Watts
+  cda: number; // m^2 (Drag coefficient * Frontal area)
+  crr: number; // Rolling resistance coefficient
+  gradient: number; // % (e.g., 5 for 5%)
+  windSpeed: number; // m/s (positive for headwind)
+  airDensity: number; // kg/m^3 (default ~1.225)
+}
+
+const G = 9.80665; // Gravity constant
+
+export function calculateSpeed(params: PhysicsParams): number {
+  const {
+    riderWeight,
+    bikeWeight,
+    power,
+    cda,
+    crr,
+    gradient,
+    windSpeed,
+    airDensity,
+  } = params;
+
+  const totalMass = riderWeight + bikeWeight;
+  const theta = Math.atan(gradient / 100);
+  
+  // Coefficients for the cubic equation: av^3 + bv^2 + cv - P = 0
+  const a = 0.5 * cda * airDensity;
+  const b = cda * airDensity * windSpeed;
+  const c = 0.5 * cda * airDensity * Math.pow(windSpeed, 2) + 
+            Math.cos(theta) * totalMass * G * crr + 
+            Math.sin(theta) * totalMass * G;
+
+  // Newton-Raphson to solve for v
+  let v = 5; // Initial guess (5 m/s or 18 km/h)
+  for (let i = 0; i < 10; i++) {
+    const f = a * Math.pow(v, 3) + b * Math.pow(v, 2) + c * v - power;
+    const df = 3 * a * Math.pow(v, 2) + 2 * b * v + c;
+    const nextV = v - f / df;
+    if (Math.abs(nextV - v) < 0.0001) {
+      v = nextV;
+      break;
+    }
+    v = nextV;
+  }
+
+  return Math.max(0, v * 3.6); // Convert m/s to km/h
+}
+
+export function calculatePower(params: Omit<PhysicsParams, 'power'> & { speed: number }): number {
+  const {
+    riderWeight,
+    bikeWeight,
+    speed, // km/h
+    cda,
+    crr,
+    gradient,
+    windSpeed,
+    airDensity,
+  } = params;
+
+  const v = speed / 3.6; // Convert km/h to m/s
+  const totalMass = riderWeight + bikeWeight;
+  const theta = Math.atan(gradient / 100);
+
+  const pDrag = 0.5 * cda * airDensity * Math.pow(v + windSpeed, 2) * v;
+  const pRolling = v * Math.cos(theta) * totalMass * G * crr;
+  const pGravity = v * Math.sin(theta) * totalMass * G;
+
+  return Math.max(0, pDrag + pRolling + pGravity);
+}

@@ -1,0 +1,5 @@
+{
+  "name": "VeloCalc - Cycling Power & Speed Comparison",
+  "description": "A professional cycling performance calculator to compare different rider setups, weights, and power outputs on various gradients.",
+  "requestFramePermissions": []
+}
